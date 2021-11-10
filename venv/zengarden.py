@@ -19,8 +19,8 @@ class Monk():
     def __init__(self, state, fitness, starts, moves, generation):
         self.state = state
         self.fitness = fitness
-        self.starts = starts # list
-        self.moves = moves # list
+        self.starts = starts  # list
+        self.moves = moves  # list
         self.generation = generation
 
 
@@ -32,35 +32,41 @@ def generateGarden():
     # FRAME
     if y == 0 and x == 0:
         for x in range(N):
-            if x == 0 or x == N-1:
+            if x == 0 or x == N - 1:
                 continue
             else:
                 garden[y][x] = 's' + str(value)
                 value += 1
 
-    if y == 0 and x == N-1:
+    if y == 0 and x == N - 1:
         for y in range(M):
-            if y == 0 or y == M-1:
+            if y == 0 or y == M - 1:
                 continue
             else:
                 garden[y][x] = 's' + str(value)
                 value += 1
 
-    if y == M-1 and x == N-1:
-        for x in range(N-1, -1, -1):
-            if x == N-1 or x == 0:
+    if y == M - 1 and x == N - 1:
+        for x in range(N - 1, -1, -1):
+            if x == N - 1 or x == 0:
                 continue
             else:
                 garden[y][x] = 's' + str(value)
                 value += 1
 
-    if y == M-1 and x == 0:
-        for y in range(M-1, -1, -1):
-            if y == M-1 or y == 0:
+    if y == M - 1 and x == 0:
+        for y in range(M - 1, -1, -1):
+            if y == M - 1 or y == 0:
                 continue
             else:
                 garden[y][x] = 's' + str(value)
                 value += 1
+
+    # de-represent corners
+    garden[0][0] = ''
+    garden[0][N-1] = ''
+    garden[M-1][0] = ''
+    garden[M-1][N-1] = ''
 
     # PUT STONES (temporarily)
     # rocksNum = rocks
@@ -71,26 +77,27 @@ def generateGarden():
     #     garden[y][x] = -1
     #     rocksNum -= 1
 
-        garden[2][6] = -1
-        garden[3][2] = -1
-        garden[4][5] = -1
-        garden[5][3] = -1
-        garden[7][9] = -1
-        garden[7][10] = -1
+    garden[2][6] = -1
+    garden[3][2] = -1
+    garden[4][5] = -1
+    garden[5][3] = -1
+    garden[7][9] = -1
+    garden[7][10] = -1
 
-        # if re.search('^s', garden[y-1][x]):
+        # put starting postiions blocked by stones in blocked
+        # if garden[y-1][x][0] == 's':
         #     blocked.append(garden[y-1][x])
-        # if re.search('^s', garden[y+1][x]):
+        # if garden[y+1][x][0] == 's':
         #     blocked.append(garden[y+1][x])
-        # if re.search('^s', garden[y][x-1]):
+        # if garden[y][x-1][0] == 's':
         #     blocked.append(garden[y][x-1])
-        # if re.search('^s', garden[y][x+1]):
+        # if garden[y][x+1][0] == 's':
         #     blocked.append(garden[y][x+1])
 
     return value
 
 
-def setWay(x, y):
+def setWay(x, y): # sets the initial direction of the monk
     if x + 1 >= N:
         return 'l'
     if x - 1 < 0:
@@ -99,109 +106,121 @@ def setWay(x, y):
         return 'u'
     if y - 1 < 0:
         return 'd'
-
     return None
 
 
-def check_up(state, x, y):
-    if re.search('^s', state[y-1][x]):
-        return state[y-1][x]
-    return False
-
-
-def check_down(state, x, y):
-    if re.search('^s', state[y + 1][x]):
-        return state[y + 1][x]
-    return False
-
-
-def check_right(state, x, y):
-    if re.search('^s', state[y][x+1]):
-        return state[y][x+1]
-    return False
-
-
-def check_left(state, x, y):
-    if re.search('^s', state[y][x - 1]):
-        return state[y][x - 1]
-    return False
+def check(state, x, y):
+    if (x < N-1 and x > 0) and (y < M-1 and y > 0):
+        if state[y][x][0] == 's' or state[y][x] == '0':
+            return 1
+        return 0
 
 
 def rake(monk: Monk):
     used = set()
+    direction = None
     pg = monk.state
-    finished = 0
     cnt = 1
+    moveOrd = 0
 
     for pos in monk.starts:
-        if pos not in used or pos not in blocked:
-            y, x = np.where(pg == pos)
-            y = int(y)
-            x = int(x)
-            way = setWay(x, y)
+        if pos not in used:
+            y, x = np.where(pg == pos) # get coordinates
+            x, y = int(x), int(y)
+            direction = setWay(x, y)
 
-            # while finished == 0:
-            if way == 'd':
-                while True:
+            while True:
+                if direction == 'd':
+                    if not check(pg, x, y+1): # check whether first tile is free
+                        break
+
                     y += 1
-                    pg[y][x] = cnt
-
-                    if pg[y+1][x] == '-1' or pg[y+1][x] != '0':
+                    if pg[y][x][0] == 's':
+                        used.add(pg[y][x])
                         break
-                    elif re.search('^s', pg[y+1][x]):
-                        used.add(pg[y+1][x])
+                    if pg[y][x] != '0':
+                        y -= 1
+                        if check(pg, x+1, y) and check(pg, x-1, y):
+                            direction = monk.moves[moveOrd]
+                            moveOrd += 1
+                            if moveOrd >= len(monk.moves): moveOrd = 0
+                            continue
+                        elif check(pg, x+1, y): direction = 'r'
+                        elif check(pg, x-1, y): direction = 'l'
+                        else: break
+
+                elif direction == 'u':
+                    if not check(pg, x, y-1):  # check whether first tile is free
                         break
 
-            if way == 'u':
-                while True:
                     y -= 1
-                    pg[y][x] = cnt
+                    if pg[y][x][0] == 's':
+                        used.add(pg[y][x])
+                        break
+                    if pg[y][x] != '0':
+                        y += 1
+                        if check(pg, x+1, y) and check(pg, x-1, y):
+                            direction = monk.moves[moveOrd]
+                            moveOrd += 1
+                            if moveOrd >= len(monk.moves): moveOrd = 0
+                            elif check(pg, x + 1, y): direction = 'r'
+                            elif check(pg, x - 1, y): direction = 'l'
+                            else: break
 
-                    if pg[y - 1][x] == '-1' or pg[y - 1][x] != '0':
-                        break
-                    elif re.search('^s', pg[y - 1][x]):
-                        used.add(pg[y - 1][x])
+                elif direction == 'r':
+                    if not check(pg, x+1, y):
                         break
 
-            if way == 'l':
-                while True:
-                    x -= 1
-                    pg[y][x] = cnt
-
-                    if pg[y][x-1] == '-1' or pg[y][x-1] != '0':
-                        break
-                    elif re.search('^s', pg[y][x-1]):
-                        used.add(pg[y][x-1])
-                        break
-                        
-            if way == 'r':
-                while True:
                     x += 1
-                    pg[y][x] = cnt
-
-                    if pg[y][x + 1] == '-1' or pg[y][x + 1] != '0':
+                    if pg[y][x][0] == 's':
+                        used.add(pg[y][x])
                         break
-                    elif re.search('^s', pg[y][x + 1]):
-                        used.add(pg[y][x + 1])
+                    if pg[y][x] != '0':
+                        x -= 1
+                        if check(pg, x, y-1) and check(pg, x, y+1):
+                            direction = 'u' if monk.moves[moveOrd] == 'r' else 'd'
+                            moveOrd += 1
+                            if moveOrd >= len(monk.moves): moveOrd = 0
+                        elif check(pg, x, y-1): direction = 'u'
+                        elif check(pg, x, y+1): direction = 'd'
+                        else: break
+
+                elif direction == 'l':
+                    if not check(pg, x-1, y):
                         break
 
+                    x -= 1
+                    if pg[y][x][0] == 's':
+                        used.add(pg[y][x])
+                        break
+                    if pg[y][x] != '0':
+                        x -= 1
+                        if check(pg, x, y - 1) and check(pg, x, y + 1):
+                            direction = 'u' if monk.moves[moveOrd] == 'r' else 'd'
+                            moveOrd += 1
+                            if moveOrd >= len(monk.moves): moveOrd = 0
+                        elif check(pg, x, y - 1):
+                            direction = 'u'
+                        elif check(pg, x, y + 1):
+                            direction = 'd'
+                        else:
+                            break
+
+                pg[y][x] = cnt
             cnt += 1
-
-        else:
-            continue
 
     return monk
 
 
 def generation(n: int):
     generation = []
-    maxGenes = (M-2) + (N-2) + rocks
+    maxGenes = (M - 2) + (N - 2) + rocks
 
-    for i in range(n): # generate n monks
+    for i in range(n):  # generate n monks
         monk = Monk(deepcopy(garden), 0, [], [], generations)
 
         # GENE GENERATION
-        for i in range((maxGenes // 3)*2 - rd.randrange(0, 3)):
+        for i in range((maxGenes // 3) * 2 - rd.randrange(0, 3)):
             gene = 's' + str(rd.randrange(1, paveNum))
             if gene in monk.starts:
                 while gene in monk.starts:
@@ -218,11 +237,12 @@ def generation(n: int):
 
     return generation
 
+
 def main():
     global paveNum
 
     paveNum = generateGarden()
-    print(garden)
+    print(pandas.DataFrame(garden))
     print(pandas.DataFrame(rake(generation(100)[0]).state))
 
 if __name__ == '__main__':
