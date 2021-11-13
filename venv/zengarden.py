@@ -109,6 +109,18 @@ def setWay(x, y): # sets the initial direction of the monk
     return None
 
 
+def check_first(state, direction, x, y):
+    if direction == 'd':
+        if str(state[y+1][x]) == '0': return 1
+    elif direction == 'u':
+        if str(state[y - 1][x]) == '0': return 1
+    elif direction == 'r':
+        if str(state[y][x+1]) == '0': return 1
+    elif direction == 'l':
+        if str(state[y][x-1]) == '0': return 1
+    return 0
+
+
 def check_border(x, y):
     if x > N-1 or x < 0 or y > M-1 or y < 0:
         return 0
@@ -135,86 +147,88 @@ def rake(monk: Monk):
             x, y = int(x), int(y)
             direction = setWay(x, y)
 
-            while True:
-                if direction == 'd':
-                    if not check_border(x, y+1): # check whether first tile is free
-                        break
+            if check_first(pg, direction, x, y):
 
-                    y += 1
-                    if pg[y][x][0] == 's':
-                        used.add(pg[y][x])
-                        break
-                    if str(pg[y][x]) != '0': # add y-1 condition if starting position
-                        y -= 1
-                        if check(pg, x+1, y) and check(pg, x-1, y):
-                            direction = monk.moves[moveOrd]
-                            moveOrd += 1
-                            if moveOrd >= len(monk.moves): moveOrd = 0
-                            continue
-                        elif check(pg, x+1, y): direction = 'r'
-                        elif check(pg, x-1, y): direction = 'l'
-                        else: return monk
-                        continue
+                while True:
+                    if direction == 'd':
+                        if not check_border(x, y+1): # check whether first tile is free
+                            break
 
-                elif direction == 'u':
-                    if not check_border(x, y-1):
-                        break
-
-                    y -= 1
-                    if pg[y][x][0] == 's':
-                        used.add(pg[y][x])
-                        break
-                    if str(pg[y][x]) != '0':
                         y += 1
-                        if check(pg, x+1, y) and check(pg, x-1, y):
-                            direction = monk.moves[moveOrd]
-                            moveOrd += 1
-                            if moveOrd >= len(monk.moves): moveOrd = 0
-                        elif check(pg, x + 1, y): direction = 'r'
-                        elif check(pg, x - 1, y): direction = 'l'
-                        else: return monk
-                        continue
+                        if pg[y][x][0] == 's':
+                            used.add(pg[y][x])
+                            break
+                        if str(pg[y][x]) != '0': # add y-1 condition if starting position
+                            y -= 1
+                            if check(pg, x+1, y) and check(pg, x-1, y):
+                                direction = monk.moves[moveOrd]
+                                moveOrd += 1
+                                if moveOrd >= len(monk.moves): moveOrd = 0
+                                continue
+                            elif check(pg, x+1, y): direction = 'r'
+                            elif check(pg, x-1, y): direction = 'l'
+                            else: return monk
+                            continue
 
-                elif direction == 'r':
-                    if not check_border(x+1, y):
-                        break
+                    elif direction == 'u':
+                        if not check_border(x, y-1):
+                            break
 
-                    x += 1
-                    if pg[y][x][0] == 's':
-                        used.add(pg[y][x])
-                        break
-                    if str(pg[y][x]) != '0':
-                        x -= 1
-                        if check(pg, x, y-1) and check(pg, x, y+1):
-                            direction = 'u' if monk.moves[moveOrd] == 'r' else 'd'
-                            moveOrd += 1
-                            if moveOrd >= len(monk.moves): moveOrd = 0
-                        elif check(pg, x, y-1): direction = 'u'
-                        elif check(pg, x, y+1): direction = 'd'
-                        else: return monk
-                        continue
+                        y -= 1
+                        if pg[y][x][0] == 's':
+                            used.add(pg[y][x])
+                            break
+                        if str(pg[y][x]) != '0':
+                            y += 1
+                            if check(pg, x+1, y) and check(pg, x-1, y):
+                                direction = monk.moves[moveOrd]
+                                moveOrd += 1
+                                if moveOrd >= len(monk.moves): moveOrd = 0
+                            elif check(pg, x + 1, y): direction = 'r'
+                            elif check(pg, x - 1, y): direction = 'l'
+                            else: return monk
+                            continue
 
-                elif direction == 'l':
-                    if not check_border(x-1, y):
-                        break
+                    elif direction == 'r':
+                        if not check_border(x+1, y):
+                            break
 
-                    x -= 1
-                    if pg[y][x][0] == 's':
-                        used.add(pg[y][x])
-                        break
-                    if str(pg[y][x]) != '0':
                         x += 1
-                        if check(pg, x, y - 1) and check(pg, x, y + 1):
-                            direction = 'u' if monk.moves[moveOrd] == 'r' else 'd'
-                            moveOrd += 1
-                            if moveOrd >= len(monk.moves): moveOrd = 0
-                        elif check(pg, x, y - 1): direction = 'u'
-                        elif check(pg, x, y + 1): direction = 'd'
-                        else: return monk
-                        continue
+                        if pg[y][x][0] == 's':
+                            used.add(pg[y][x])
+                            break
+                        if str(pg[y][x]) != '0':
+                            x -= 1
+                            if check(pg, x, y-1) and check(pg, x, y+1):
+                                direction = 'u' if monk.moves[moveOrd] == 'r' else 'd'
+                                moveOrd += 1
+                                if moveOrd >= len(monk.moves): moveOrd = 0
+                            elif check(pg, x, y-1): direction = 'u'
+                            elif check(pg, x, y+1): direction = 'd'
+                            else: return monk
+                            continue
 
-                pg[y][x] = cnt
-            cnt += 1
+                    elif direction == 'l':
+                        if not check_border(x-1, y):
+                            break
+
+                        x -= 1
+                        if pg[y][x][0] == 's':
+                            used.add(pg[y][x])
+                            break
+                        if str(pg[y][x]) != '0':
+                            x += 1
+                            if check(pg, x, y - 1) and check(pg, x, y + 1):
+                                direction = 'u' if monk.moves[moveOrd] == 'r' else 'd'
+                                moveOrd += 1
+                                if moveOrd >= len(monk.moves): moveOrd = 0
+                            elif check(pg, x, y - 1): direction = 'u'
+                            elif check(pg, x, y + 1): direction = 'd'
+                            else: return monk
+                            continue
+
+                    pg[y][x] = cnt
+                cnt += 1
 
     return monk
 
