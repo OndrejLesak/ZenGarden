@@ -24,6 +24,10 @@ class Monk():
         self.generation = generation
 
 
+def fitSort(k):
+    return k.fitness
+
+
 def generateGarden():
     global garden, blocked
     value = 1
@@ -97,6 +101,33 @@ def generateGarden():
     return value
 
 
+def generation(n: int):
+    generation = []
+    maxGenes = (M - 2) + (N - 2) + rocks
+    startGenes = (maxGenes // 3) * 2 - rd.randrange(0, 3)
+
+    for i in range(n):  # generate n monks
+        monk = Monk(deepcopy(garden), 0, [], [], generations)
+
+        # SATRTING POSITION GENE GENERATION
+        for i in range(startGenes):
+            gene = 's' + str(rd.randrange(1, paveNum))
+            if gene in monk.starts and gene not in blocked:
+                while gene in monk.starts and gene not in blocked:
+                    gene = 's' + str(rd.randrange(1, paveNum))
+
+            monk.starts.append(gene)
+
+        # MOVEMENT GENES
+        for i in range(rd.randrange(1, maxGenes - len(monk.starts))):
+            move = rd.randrange(0, len(moveGenes))
+            monk.moves.append(moveGenes[move])
+
+        generation.append(monk)
+
+    return generation
+
+
 def setWay(x, y): # sets the initial direction of the monk
     if x + 1 >= N:
         return 'l'
@@ -140,6 +171,7 @@ def rake(monk: Monk):
     pg = monk.state
     cnt = 1
     moveOrd = 0
+    monk.fitness = (M - 2) * (N - 2) - rocks # initial fitness (all the available zeros)
 
     for pos in monk.starts:
         if pos not in used:
@@ -147,11 +179,12 @@ def rake(monk: Monk):
             x, y = int(x), int(y)
             direction = setWay(x, y)
 
-            if check_first(pg, direction, x, y):
+
+            if check_first(pg, direction, x, y):  # check whether first tile is free
 
                 while True:
-                    if direction == 'd':
-                        if not check_border(x, y+1): # check whether first tile is free
+                    if direction == 'd': # down
+                        if not check_border(x, y+1):
                             break
 
                         y += 1
@@ -167,10 +200,10 @@ def rake(monk: Monk):
                                 continue
                             elif check(pg, x+1, y): direction = 'r'
                             elif check(pg, x-1, y): direction = 'l'
-                            else: return monk
+                            else: return monk # if stuck
                             continue
 
-                    elif direction == 'u':
+                    elif direction == 'u': # up
                         if not check_border(x, y-1):
                             break
 
@@ -186,10 +219,10 @@ def rake(monk: Monk):
                                 if moveOrd >= len(monk.moves): moveOrd = 0
                             elif check(pg, x + 1, y): direction = 'r'
                             elif check(pg, x - 1, y): direction = 'l'
-                            else: return monk
+                            else: return monk # if stuck
                             continue
 
-                    elif direction == 'r':
+                    elif direction == 'r': # right
                         if not check_border(x+1, y):
                             break
 
@@ -205,10 +238,10 @@ def rake(monk: Monk):
                                 if moveOrd >= len(monk.moves): moveOrd = 0
                             elif check(pg, x, y-1): direction = 'u'
                             elif check(pg, x, y+1): direction = 'd'
-                            else: return monk
+                            else: return monk # if stuck
                             continue
 
-                    elif direction == 'l':
+                    elif direction == 'l': # left
                         if not check_border(x-1, y):
                             break
 
@@ -224,39 +257,27 @@ def rake(monk: Monk):
                                 if moveOrd >= len(monk.moves): moveOrd = 0
                             elif check(pg, x, y - 1): direction = 'u'
                             elif check(pg, x, y + 1): direction = 'd'
-                            else: return monk
+                            else: return monk # if stuck
                             continue
 
                     pg[y][x] = cnt
+                    monk.fitness -= 1
                 cnt += 1
 
     return monk
 
 
-def generation(n: int):
-    generation = []
-    maxGenes = (M - 2) + (N - 2) + rocks
+def evolve(population):
+    totalFit = 0
 
-    for i in range(n):  # generate n monks
-        monk = Monk(deepcopy(garden), 0, [], [], generations)
+    # ASCENDING SORT OF THE POPULATION
+    population.sort(key=fitSort)
 
-        # GENE GENERATION
-        for i in range((maxGenes // 3) * 2 - rd.randrange(0, 3)):
-            gene = 's' + str(rd.randrange(1, paveNum))
-            if gene in monk.starts:
-                while gene in monk.starts:
-                    gene = 's' + str(rd.randrange(1, paveNum))
+    # TOTAL POPULATION FITNESS
+    for monk in population:
+        totalFit += monk.fitness
 
-            monk.starts.append(gene)
-
-        # MOVEMENT GENES
-        for i in range(rd.randrange(1, maxGenes - len(monk.starts))):
-            move = rd.randrange(0, len(moveGenes))
-            monk.moves.append(moveGenes[move])
-
-        generation.append(monk)
-
-    return generation
+    return totalFit
 
 
 def main():
@@ -264,10 +285,12 @@ def main():
 
     paveNum = generateGarden()
     print(pandas.DataFrame(garden))
-    # print(pandas.DataFrame(garden))
-    monk = rake(generation(100)[0])
-    print(monk.starts)
-    print(pandas.DataFrame(monk.state))
+    monks = generation(100)
+
+    for monk in monks:
+        rake(monk)
+
+    print(evolve(monks))
 
 if __name__ == '__main__':
     main()
