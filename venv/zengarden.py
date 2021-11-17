@@ -2,15 +2,20 @@ import numpy as np
 import time
 import random as rd
 from copy import deepcopy
-import re
 import pandas
 
+# settings
 M, N = 12, 14
-garden = np.zeros((M, N), dtype=int).astype(str)
 rocks = 6
-paveNum = 0
-generations = 1
+selection = 'TOURNAMENT'
+mutateChance = 0.1
+population_size = 100
 
+# global variables
+garden = np.zeros((M, N), dtype=int).astype(str)
+paveNum = 0
+
+# global structures
 moveGenes = ['l', 'r']
 blocked = []
 
@@ -107,9 +112,9 @@ def generation(n: int):
     startGenes = (maxGenes // 3) * 2 - rd.randrange(0, 3)
 
     for i in range(n):  # generate n monks
-        monk = Monk(deepcopy(garden), 0, [], [], generations)
+        monk = Monk(deepcopy(garden), 0, [], [], 1)
 
-        # SATRTING POSITION GENE GENERATION
+        # STARTING POSITION GENE GENERATION
         for i in range(startGenes):
             gene = 's' + str(rd.randrange(1, paveNum))
             if gene in monk.starts and gene not in blocked:
@@ -171,11 +176,11 @@ def rake(monk: Monk):
     pg = monk.state
     cnt = 1
     moveOrd = 0
-    monk.fitness = (M - 2) * (N - 2) - rocks # initial fitness (all the available zeros)
+    monk.fitness = 0 # initial fitness (all the available zeros)
 
     for pos in monk.starts:
         if pos not in used:
-            y, x = np.where(pg == pos) # get coordinates
+            y, x = np.where(pg == pos) # get coordinate
             x, y = int(x), int(y)
             direction = setWay(x, y)
 
@@ -261,7 +266,7 @@ def rake(monk: Monk):
                             continue
 
                     pg[y][x] = cnt
-                    monk.fitness -= 1
+                    monk.fitness += 1
                 cnt += 1
 
     return monk
@@ -269,15 +274,100 @@ def rake(monk: Monk):
 
 def evolve(population):
     totalFit = 0
+    newPopulation = []
 
-    # ASCENDING SORT OF THE POPULATION
-    population.sort(key=fitSort)
+    # ascending sort of the population
+    population.sort(key=fitSort, reverse=True)
 
-    # TOTAL POPULATION FITNESS
+    # total population fitness
     for monk in population:
         totalFit += monk.fitness
 
-    return totalFit
+    parents = round(population_size * 0.1) + 3
+    for i in range(parents):
+        if selection == 'ROULETTE':
+            newPal = roulette(population, totalFit)
+            if newPal in newPopulation:
+                while newPal in newPopulation:
+                    newPal = roulette(population, totalFit)
+
+        if selection == 'TOURNAMENT':
+            newPal = tournament(population)
+            if newPal in newPopulation:
+                while newPal in newPopulation:
+                    newPal = tournament(population)
+
+        newPopulation.append(newPal)
+
+    # cross-over chromosomes
+    i = 0
+    while i < parents-1:
+        j = i + 1
+        for j in range(parents):
+            if len(newPopulation) >= population_size: break
+
+            mutate = True if rd.random() <= mutateChance else False # can the next child mutate?
+            if newPopulation[i].fitness > newPopulation[j].fitness:
+                newPal = geneCrossover(newPopulation[i], newPopulation[j], mutate)
+            else:
+                newPal = geneCrossover(newPopulation[j], newPopulation[i], mutate)
+
+            newPopulation.append(newPal)
+        i += 1
+
+    return newPopulation
+
+
+def geneCrossover(chromosome1, chromosome2, mutate = False):
+    proportion = (len(chromosome1.starts) // 3) * 2
+    newStarts = chromosome1.starts[0: proportion]
+
+    for i in range(proportion, len(chromosome2.starts)): # add part of the second chromosome
+        if chromosome2.starts[i] in newStarts:
+
+           for j in range(proportion):
+               if chromosome2.starts[j] not in newStarts:
+                   newStarts.append(chromosome2.starts[j])
+                   break
+        else:
+            newStarts.append(chromosome2.starts[i])
+
+    newChrom = Monk(deepcopy(garden), 0, newStarts, deepcopy(chromosome1.moves), chromosome1.generation + 1)
+
+    if mutate is True:
+        gene_to_mutate = rd.randint(0, len(newChrom.starts)-1)
+        mutated = 's' + str(rd.randint(1, paveNum))
+
+        if mutated == newChrom.starts[gene_to_mutate]: # if new mutation is the same as mutated gene
+            while mutated == newChrom.starts[gene_to_mutate]:
+                mutated = 's' + str(rd.randint(1, paveNum))
+
+        newChrom.starts[gene_to_mutate] = mutated
+    return newChrom
+
+
+def tournament(population):
+    first = rd.randint(0, len(population)-1)
+    second = rd.randint(0, len(population)-1)
+
+    if first == second: # preventing from competing against itself
+        while first != second:
+            second = rd.randint(0, len(population)-1)
+
+    if population[first].fitness > population[second].fitness:
+        return population[first]
+    else:
+        return population[second]
+
+
+def roulette(population, totalFit):
+    ratio = rd.randint(0, totalFit)
+    sum = 0
+
+    for monk in reversed(population):
+        sum += monk.fitness
+        if sum > ratio:
+            return monk
 
 
 def main():
@@ -285,12 +375,13 @@ def main():
 
     paveNum = generateGarden()
     print(pandas.DataFrame(garden))
-    monks = generation(100)
+    monks = generation(population_size)
 
     for monk in monks:
         rake(monk)
 
-    print(evolve(monks))
+    newPop = evolve(monks)
+    print(newPop)
 
 if __name__ == '__main__':
     main()
