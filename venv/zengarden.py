@@ -4,12 +4,13 @@ import random as rd
 from copy import deepcopy
 import pandas
 
-# settings
+# settings - replace with settings dictionary
 M, N = 12, 14
 rocks = 6
 selection = 'TOURNAMENT'
-mutateChance = 0.1
+mutateChance = 0.08
 population_size = 100
+max_generations = 1000
 
 # global variables
 garden = np.zeros((M, N), dtype=int).astype(str)
@@ -17,16 +18,16 @@ paveNum = 0
 
 # global structures
 moveGenes = ['l', 'r']
-blocked = []
 
 
 class Monk():
-    def __init__(self, state, fitness, starts, moves, generation):
+    def __init__(self, state, fitness, starts, moves, generation, isStuck = False):
         self.state = state
         self.fitness = fitness
         self.starts = starts  # list
         self.moves = moves  # list
         self.generation = generation
+        self.isStuck = isStuck
 
 
 def fitSort(k):
@@ -72,10 +73,10 @@ def generateGarden():
                 value += 1
 
     # de-represent corners
-    garden[0][0] = ''
-    garden[0][N-1] = ''
-    garden[M-1][0] = ''
-    garden[M-1][N-1] = ''
+    garden[0][0] = ' '
+    garden[0][N-1] = ' '
+    garden[M-1][0] = ' '
+    garden[M-1][N-1] = ' '
 
     # PUT STONES (temporarily)
     # rocksNum = rocks
@@ -93,16 +94,6 @@ def generateGarden():
     garden[7][9] = -1
     garden[7][10] = -1
 
-        # put starting postiions blocked by stones in blocked
-        # if garden[y-1][x][0] == 's':
-        #     blocked.append(garden[y-1][x])
-        # if garden[y+1][x][0] == 's':
-        #     blocked.append(garden[y+1][x])
-        # if garden[y][x-1][0] == 's':
-        #     blocked.append(garden[y][x-1])
-        # if garden[y][x+1][0] == 's':
-        #     blocked.append(garden[y][x+1])
-
     return value
 
 
@@ -117,14 +108,14 @@ def generation(n: int):
         # STARTING POSITION GENE GENERATION
         for i in range(startGenes):
             gene = 's' + str(rd.randrange(1, paveNum))
-            if gene in monk.starts and gene not in blocked:
-                while gene in monk.starts and gene not in blocked:
+            if gene in monk.starts:
+                while gene in monk.starts:
                     gene = 's' + str(rd.randrange(1, paveNum))
 
             monk.starts.append(gene)
 
         # MOVEMENT GENES
-        for i in range(rd.randrange(1, maxGenes - len(monk.starts))):
+        for i in range((maxGenes - len(monk.starts)) // 3):
             move = rd.randrange(0, len(moveGenes))
             monk.moves.append(moveGenes[move])
 
@@ -205,7 +196,10 @@ def rake(monk: Monk):
                                 continue
                             elif check(pg, x+1, y): direction = 'r'
                             elif check(pg, x-1, y): direction = 'l'
-                            else: return monk # if stuck
+                            else:
+                                monk.fitness = int(monk.fitness * 0.2)
+                                monk.isStuck = True
+                                return monk # if stuck
                             continue
 
                     elif direction == 'u': # up
@@ -224,7 +218,10 @@ def rake(monk: Monk):
                                 if moveOrd >= len(monk.moves): moveOrd = 0
                             elif check(pg, x + 1, y): direction = 'r'
                             elif check(pg, x - 1, y): direction = 'l'
-                            else: return monk # if stuck
+                            else:
+                                monk.fitness = int(monk.fitness * 0.2)
+                                monk.isStuck = True
+                                return monk # if stuck
                             continue
 
                     elif direction == 'r': # right
@@ -243,7 +240,10 @@ def rake(monk: Monk):
                                 if moveOrd >= len(monk.moves): moveOrd = 0
                             elif check(pg, x, y-1): direction = 'u'
                             elif check(pg, x, y+1): direction = 'd'
-                            else: return monk # if stuck
+                            else:
+                                monk.fitness = int(monk.fitness * 0.2)
+                                monk.isStuck = True
+                                return monk # if stuck
                             continue
 
                     elif direction == 'l': # left
@@ -262,27 +262,35 @@ def rake(monk: Monk):
                                 if moveOrd >= len(monk.moves): moveOrd = 0
                             elif check(pg, x, y - 1): direction = 'u'
                             elif check(pg, x, y + 1): direction = 'd'
-                            else: return monk # if stuck
+                            else:
+                                monk.fitness = int(monk.fitness * 0.2)
+                                monk.isStuck = True
+                                return monk # if stuck
                             continue
 
-                    pg[y][x] = cnt
-                    monk.fitness += 1
-                cnt += 1
+                        pg[y][x] = cnt
+                        monk.fitness += 1
+                    cnt += 1
 
-    return monk
+        return monk
 
 
 def evolve(population):
     totalFit = 0
+    stated = []
     newPopulation = []
 
     # ascending sort of the population
     population.sort(key=fitSort, reverse=True)
 
+    if '0' not in population[0].state and not population[0].isStuck: # correct result check
+        return population[0]
+
     # total population fitness
     for monk in population:
         totalFit += monk.fitness
 
+    # choose parents to be passed to the new generation
     parents = round(population_size * 0.1) + 3
     for i in range(parents):
         if selection == 'ROULETTE':
@@ -297,50 +305,57 @@ def evolve(population):
                 while newPal in newPopulation:
                     newPal = tournament(population)
 
+        newPal.isStuck = False
         newPopulation.append(newPal)
 
     # cross-over chromosomes
     i = 0
-    while i < parents-1:
-        j = i + 1
-        for j in range(parents):
+    while i < parents-2:
+        for j in range(i+1, parents-2):
             if len(newPopulation) >= population_size: break
 
             mutate = True if rd.random() <= mutateChance else False # can the next child mutate?
-            if newPopulation[i].fitness > newPopulation[j].fitness:
-                newPal = geneCrossover(newPopulation[i], newPopulation[j], mutate)
-            else:
-                newPal = geneCrossover(newPopulation[j], newPopulation[i], mutate)
+            newPal = geneCrossover(newPopulation[i], newPopulation[j], newPopulation, mutate)
 
             newPopulation.append(newPal)
         i += 1
 
-    return newPopulation
+    population.clear()
+    for monk in newPopulation:
+        if monk.fitness != 0:
+            population.append(monk)
+        else:
+            population.append(rake(monk))
+
+    return None
 
 
-def geneCrossover(chromosome1, chromosome2, mutate = False):
-    proportion = (len(chromosome1.starts) // 3) * 2
-    newStarts = chromosome1.starts[0: proportion]
+def geneCrossover(chromosome1, chromosome2, newPopulation, mutate = False):
+    proportion_starts = rd.randint(1, (len(chromosome1.starts) // 2))
+    proportion_moves = rd.randint(1, (len(chromosome1.moves) // 2))
+    newStarts = chromosome1.starts[0: proportion_starts]
+    newMoves = chromosome1.moves[0: proportion_moves] + chromosome2.moves[proportion_moves: len(chromosome2.moves)]
 
-    for i in range(proportion, len(chromosome2.starts)): # add part of the second chromosome
+    for i in range(proportion_starts, len(chromosome2.starts)): # add part of the second chromosome
         if chromosome2.starts[i] in newStarts:
 
-           for j in range(proportion):
+           for j in range(proportion_starts):
                if chromosome2.starts[j] not in newStarts:
                    newStarts.append(chromosome2.starts[j])
                    break
         else:
             newStarts.append(chromosome2.starts[i])
 
-    newChrom = Monk(deepcopy(garden), 0, newStarts, deepcopy(chromosome1.moves), chromosome1.generation + 1)
+    newChrom = Monk(deepcopy(garden), 0, newStarts, newMoves, chromosome1.generation + 1)
 
     if mutate is True:
-        gene_to_mutate = rd.randint(0, len(newChrom.starts)-1)
-        mutated = 's' + str(rd.randint(1, paveNum))
+        for i in range(rd.randint(1, 2)):
+            gene_to_mutate = rd.randint(0, len(newChrom.starts)-1)
+            mutated = 's' + str(rd.randint(1, paveNum-1))
 
-        if mutated == newChrom.starts[gene_to_mutate]: # if new mutation is the same as mutated gene
-            while mutated == newChrom.starts[gene_to_mutate]:
-                mutated = 's' + str(rd.randint(1, paveNum))
+            if mutated == newChrom.starts[gene_to_mutate]: # if new mutation is the same as mutated gene
+                while mutated == newChrom.starts[gene_to_mutate]:
+                    mutated = 's' + str(rd.randint(1, paveNum-1))
 
         newChrom.starts[gene_to_mutate] = mutated
     return newChrom
@@ -366,22 +381,53 @@ def roulette(population, totalFit):
 
     for monk in reversed(population):
         sum += monk.fitness
-        if sum > ratio:
+        if sum >= ratio:
             return monk
+
+
+def print_garden(zahrada):
+    for i in range(M):
+        for j in range(N):
+            # Skaly
+            if str(zahrada[i][j]) == '-1':
+                print("\033[47m    \033[00m", end="")
+            # Hranica zahrady
+            elif zahrada[i][j][0] == 's':
+                print("\033[43m    \033[00m", end="")
+            # Pohrabane policka
+            elif str(zahrada[i][j]) != '0':
+                print("\033[92m{}\033[00m".format(zahrada[i][j].rjust(3, ' ')), end=" ")
+            # Nepohrabane policka
+            else:
+                print(zahrada[i][j].rjust(3, ' '), end=" ")
+        print()
+    print()
 
 
 def main():
     global paveNum
 
     paveNum = generateGarden()
+
     print(pandas.DataFrame(garden))
     monks = generation(population_size)
 
     for monk in monks:
         rake(monk)
 
-    newPop = evolve(monks)
-    print(newPop)
+    cnt = 1
+    while cnt < max_generations:
+        population = evolve(monks)
+        if population != None:
+            print(population.starts)
+            print_garden(monks[0].state)
+            print(cnt)
+            break
+
+        print_garden(monks[0].state)
+        print(cnt)
+        cnt += 1
+
 
 if __name__ == '__main__':
     main()
