@@ -2,19 +2,21 @@ import numpy as np
 import time
 import random as rd
 from copy import deepcopy
-import pandas
 
 # settings - replace with settings dictionary
-M, N = 12, 14
-rocks = 6
+M, N = 12, 14 # shape is always +2 for each axis due to outline of the garden (6x8 = 8x10)
+rocks = 8
+sample = 1
 selection = 'TOURNAMENT'
-mutateChance = 0.08
+mutateChance = 0.1
 population_size = 100
-max_generations = 1000
+max_generations = 300
 
 # global variables
 garden = np.zeros((M, N), dtype=int).astype(str)
 paveNum = 0
+gen = 1
+ftp = None
 
 # global structures
 moveGenes = ['l', 'r']
@@ -78,21 +80,22 @@ def generateGarden():
     garden[M-1][0] = ' '
     garden[M-1][N-1] = ' '
 
-    # PUT STONES (temporarily)
-    # rocksNum = rocks
-    # while rocksNum != 0:
-    #     y = int(rd.randrange(1, M-1))
-    #     x = int(rd.randrange(1, N-1))
-    #
-    #     garden[y][x] = -1
-    #     rocksNum -= 1
+    if sample == 1:
+        garden[2][6] = -1
+        garden[3][2] = -1
+        garden[4][5] = -1
+        garden[5][3] = -1
+        garden[7][9] = -1
+        garden[7][10] = -1
+    else:
+        # PUT STONES (temporarily)
+        rocksNum = rocks
+        while rocksNum != 0:
+            y = int(rd.randrange(1, M - 1))
+            x = int(rd.randrange(1, N - 1))
 
-    garden[2][6] = -1
-    garden[3][2] = -1
-    garden[4][5] = -1
-    garden[5][3] = -1
-    garden[7][9] = -1
-    garden[7][10] = -1
+            garden[y][x] = -1
+            rocksNum -= 1
 
     return value
 
@@ -115,7 +118,7 @@ def generation(n: int):
             monk.starts.append(gene)
 
         # MOVEMENT GENES
-        for i in range((maxGenes - len(monk.starts)) // 3):
+        for i in range((maxGenes - len(monk.starts)) // 2):
             move = rd.randrange(0, len(moveGenes))
             monk.moves.append(moveGenes[move])
 
@@ -268,11 +271,11 @@ def rake(monk: Monk):
                                 return monk # if stuck
                             continue
 
-                        pg[y][x] = cnt
-                        monk.fitness += 1
-                    cnt += 1
+                    pg[y][x] = cnt
+                    monk.fitness += 1
+                cnt += 1
 
-        return monk
+    return monk
 
 
 def evolve(population):
@@ -290,8 +293,14 @@ def evolve(population):
     for monk in population:
         totalFit += monk.fitness
 
+    bestFit = population[0].fitness
+    worstFit = population[-1].fitness
+    average = totalFit/population_size
+
+    wtf(bestFit, average, worstFit)
+
     # choose parents to be passed to the new generation
-    parents = round(population_size * 0.1) + 3
+    parents = round(population_size * 0.1) + 5
     for i in range(parents):
         if selection == 'ROULETTE':
             newPal = roulette(population, totalFit)
@@ -311,7 +320,7 @@ def evolve(population):
     # cross-over chromosomes
     i = 0
     while i < parents-2:
-        for j in range(i+1, parents-2):
+        for j in range(i+1, parents-1):
             if len(newPopulation) >= population_size: break
 
             mutate = True if rd.random() <= mutateChance else False # can the next child mutate?
@@ -366,7 +375,7 @@ def tournament(population):
     second = rd.randint(0, len(population)-1)
 
     if first == second: # preventing from competing against itself
-        while first != second:
+        while first == second:
             second = rd.randint(0, len(population)-1)
 
     if population[first].fitness > population[second].fitness:
@@ -404,30 +413,36 @@ def print_garden(zahrada):
     print()
 
 
+def wtf(best, average, worst):
+    print(f'{gen}\t{best}\t{average}\t{worst}', file=ftp)
+
+
 def main():
-    global paveNum
+    global paveNum, gen, ftp
+    ftp = open('output.txt', 'w')
+    ftp.close()
+
+    ftp = open('output.txt', 'a')
 
     paveNum = generateGarden()
 
-    print(pandas.DataFrame(garden))
+    print_garden(garden)
     monks = generation(population_size)
 
     for monk in monks:
         rake(monk)
 
-    cnt = 1
-    while cnt < max_generations:
+    while gen <= max_generations:
         population = evolve(monks)
         if population != None:
-            print(population.starts)
-            print_garden(monks[0].state)
-            print(cnt)
             break
 
-        print_garden(monks[0].state)
-        print(cnt)
-        cnt += 1
+        gen += 1
 
+    print_garden(monks[0].state)
+    print(f'Generation: {gen-1}')
+
+    ftp.close()
 
 if __name__ == '__main__':
     main()
